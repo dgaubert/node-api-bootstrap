@@ -10,6 +10,7 @@ const WorkerManager = require(__source + 'cluster/master/worker-manager')
 class Logger extends LoggerInterface {}
 class Sigusr2Listener extends ListenerInterface {}
 class WorkerExitListener extends ListenerInterface {}
+class SighupListener extends ListenerInterface {}
 class Cluster extends EventEmitter {
   fork () {}
 }
@@ -27,10 +28,23 @@ describe('worker-manager', () => {
     this.workerExitListener = new WorkerExitListener()
     this.workerExitListenerListenInfoStub = this.sandbox.stub(this.workerExitListener, 'listen')
 
-    this.workerManager = new WorkerManager(this.cluster, this.sigusr2Listener, this.workerExitListener, this.logger)
+    this.sighupListener = new SighupListener()
+    this.sighupListenerListenInfoStub = this.sandbox.stub(this.sighupListener, 'listen')
+
+    this.workerManager = new WorkerManager(
+      this.cluster,
+      this.sigusr2Listener,
+      this.workerExitListener,
+      this.sighupListener,
+      this.logger
+    )
   })
 
   afterEach(() => {
+    assert.ok(this.sigusr2ListenerListenInfoStub.calledOnce)
+    assert.ok(this.workerExitListenerListenInfoStub.calledOnce)
+    assert.ok(this.sighupListenerListenInfoStub.calledOnce)
+
     this.sandbox.restore()
   })
 
@@ -90,7 +104,7 @@ describe('worker-manager', () => {
     assert.ok(!workerManagerForkStub.calledOnce)
   })
 
-  it('.reloadAll() should restart all workers', () => {
+  it('.reloadAllWorkers() should restart all workers', () => {
     var loggerInfoStub = this.sandbox.stub(this.logger, 'info')
 
     this.cluster.workers = {
@@ -98,17 +112,17 @@ describe('worker-manager', () => {
       '2': {}
     }
 
-    var workerManagerReloadStub = this.sandbox.stub(this.workerManager, 'reload')
+    var workerManagerReloadStub = this.sandbox.stub(this.workerManager, 'reloadWorker')
     workerManagerReloadStub.returns(Promise.resolve())
 
-    return this.workerManager.reloadAll()
+    return this.workerManager.reloadAllWorkers()
       .then(() => {
         assert.ok(loggerInfoStub.calledOnce)
         assert.ok(!workerManagerReloadStub.calledOnce)
       })
   })
 
-  it('.reload() should restart one worker', () => {
+  it('.reloadWorker() should restart one worker', () => {
     var newWorkerFake = new EventEmitter()
     this.workerManager.fork = function () {
       return newWorkerFake
@@ -126,10 +140,10 @@ describe('worker-manager', () => {
       '1': workerFake
     }
 
-    return this.workerManager.reload('1')
+    return this.workerManager.reloadWorker('1')
   })
 
-  it('.reload() should fail due to worker did not fork successfully', () => {
+  it('.reloadWorker() should fail due to worker did not fork successfully', () => {
     var newWorkerFake = new EventEmitter()
     this.workerManager.fork = function () {
       return newWorkerFake
@@ -147,13 +161,13 @@ describe('worker-manager', () => {
       '1': workerFake
     }
 
-    return this.workerManager.reload('1')
+    return this.workerManager.reloadWorker('1')
       .catch((err) => {
         assert.equal(err.message, 'Irrelevant error')
       })
   })
 
-  it('.reload() should fail due to worker did not make away with itself', () => {
+  it('.reloadWorker() should fail due to worker did not make away with itself', () => {
     var workerFake = new EventEmitter()
     workerFake.exitedAfterDisconnect = false
     workerFake.disconnect = function () {
@@ -165,7 +179,7 @@ describe('worker-manager', () => {
       '1': workerFake
     }
 
-    return this.workerManager.reload('1')
+    return this.workerManager.reloadWorker('1')
       .catch((err) => {
         assert.equal(err.message, 'Worker exited accidentaly')
       })

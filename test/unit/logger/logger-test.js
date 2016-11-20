@@ -3,18 +3,23 @@
 const assert = require('assert')
 const sinon = require('sinon')
 const LoggerInterface = require(__source + 'logger/logger-interface')
+const ListenerInterface = require(__source + 'listener-interface')
 const Logger = require(__source + 'logger/logger')
 
 class LoggerProvider extends LoggerInterface {}
+class SighupListener extends ListenerInterface {}
 
 describe('logger', () => {
   beforeEach(() => {
     this.sandbox = sinon.sandbox.create()
     this.provider = new LoggerProvider()
-    this.logger = new Logger(this.provider)
+    this.sighupListener = new SighupListener()
+    this.sighupListenerListenStub = this.sandbox.stub(this.sighupListener, 'listen')
+    this.logger = new Logger(this.provider, this.sighupListener)
   })
 
   afterEach(() => {
+    assert.ok(this.sighupListenerListenStub.calledOnce)
     this.sandbox.restore()
   })
 

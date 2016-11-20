@@ -12,6 +12,8 @@ const Master = require(__source + 'cluster/master/master')
 class Logger extends LoggerInterface {}
 class Sigusr2Listener extends ListenerInterface {}
 class WorkerExitListener extends ListenerInterface {}
+class SighupListener extends ListenerInterface {}
+
 class Cluster extends EventEmitter {
   fork () {}
 }
@@ -30,7 +32,13 @@ describe('master', () => {
     this.workerExitListener = new WorkerExitListener()
     this.workerExitListenerListenInfoStub = this.sandbox.stub(this.workerExitListener, 'listen')
 
-    this.workerManager = new WorkerManager(this.cluster, this.sigusr2Listener, this.workerExitListener, this.logger)
+    this.sigusr2Listener = new Sigusr2Listener()
+    this.sigusr2ListenerListenInfoStub = this.sandbox.stub(this.sigusr2Listener, 'listen')
+
+    this.sighupListener = new SighupListener()
+    this.sighupListenerListenInfoStub = this.sandbox.stub(this.sighupListener, 'listen')
+
+    this.workerManager = new WorkerManager(this.cluster, this.sigusr2Listener, this.workerExitListener, this.sighupListener, this.logger)
 
     this.master = new Master(this.workerManager, this.logger)
   })
